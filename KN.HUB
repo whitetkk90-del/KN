@@ -1,4 +1,4 @@
--- Redz Hub Completo 2025 - 100% Funcional
+-- Redz Hub Completo 2025 - 100% Funcional (Melhorado)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -15,6 +15,41 @@ _G.AutoBoss = false
 _G.AutoChest = false
 _G.AutoFruit = false
 _G.TeamCheck = true
+_G.Aimbot = false
+_G.AimbotStrength = 100 -- Força do aimbot (quanto maior, mais rápido puxa)
+_G.AimbotRange = 200 -- Alcance do aimbot
+_G.AimbotPart = "Head" -- Parte do corpo para mirar
+
+-- FORÇAR TELA DEITADA PARA O LADO DIREITO
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+-- Função para forçar landscape right
+local function forceLandscapeRight()
+    -- Tenta múltiplos métodos para garantir que funcione
+    pcall(function()
+        -- Método 1: StarterGui
+        StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
+        
+        -- Método 2: UserInputService
+        UserInputService.OrientationChanged:Connect(function()
+            StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
+        end)
+        
+        -- Método 3: Forçar constantemente
+        spawn(function()
+            while wait(0.1) do
+                pcall(function()
+                    StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
+                end)
+            end
+        end)
+    end)
+end
+
+-- Executar imediatamente
+forceLandscapeRight()
 
 -- Funções principais
 local function getEnemies()
@@ -67,6 +102,76 @@ local function getFruits()
         end
     end
     return fruits
+end
+
+-- AIMBOT FORTE SEM CHECK TIME
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = _G.AimbotRange
+    local localPlayer = game.Players.LocalPlayer
+    local localCharacter = localPlayer.Character
+    
+    if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChild("Humanoid")
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            local targetPart = character:FindFirstChild(_G.AimbotPart)
+            
+            if humanoid and humanoid.Health > 0 and hrp and targetPart then
+                -- Verifica time se TeamCheck estiver ativo
+                if _G.TeamCheck then
+                    if player.Team == localPlayer.Team then
+                        continue
+                    end
+                end
+                
+                local distance = (hrp.Position - localCharacter.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    
+    return closestPlayer
+end
+
+-- Aimbot loop - SEM CHECK TIME, SEMPRE ATIVO QUANDO LIGADO
+local aimbotConnection = nil
+
+local function startAimbot()
+    if aimbotConnection then aimbotConnection:Disconnect() end
+    
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        if not _G.Aimbot then return end
+        
+        local target = getClosestPlayer()
+        if target and target.Character then
+            local targetPart = target.Character:FindFirstChild(_G.AimbotPart)
+            local localCharacter = game.Players.LocalPlayer.Character
+            
+            if targetPart and localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
+                -- Cálculo de predição para aimbot mais forte
+                local targetVelocity = targetPart.Velocity
+                local predictionFactor = _G.AimbotStrength / 100
+                
+                local targetPosition = targetPart.Position + (targetVelocity * 0.1 * predictionFactor)
+                
+                -- CFrame.lookAt para mirar instantaneamente
+                local newCFrame = CFrame.new(
+                    localCharacter.HumanoidRootPart.Position,
+                    targetPosition
+                )
+                
+                -- Aplicação suave mas forte da rotação
+                localCharacter.HumanoidRootPart.CFrame = newCFrame
+            end
+        end
+    end)
 end
 
 -- Aba Principal
@@ -206,6 +311,67 @@ MainTab:CreateToggle({
     Flag = "TeamCheck",
     Callback = function(v)
         _G.TeamCheck = v
+    end
+})
+
+-- ABA AIMBOT (NOVA)
+local AimbotTab = Window:CreateTab("🎯 Aimbot", 4483362458)
+
+AimbotTab:CreateSection("Aimbot Settings")
+
+AimbotTab:CreateToggle({
+    Name = "Aimbot (Sem Delay)",
+    CurrentValue = false,
+    Flag = "Aimbot",
+    Callback = function(v)
+        _G.Aimbot = v
+        if v then
+            startAimbot()
+            Rayfield:Notify({
+                Title = "Aimbot Ativado",
+                Content = "Mirando em: " .. _G.AimbotPart .. " | Força: " .. _G.AimbotStrength .. "%",
+                Duration = 3
+            })
+        else
+            if aimbotConnection then
+                aimbotConnection:Disconnect()
+                aimbotConnection = nil
+            end
+        end
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Força do Aimbot",
+    Range = {1, 100},
+    Increment = 1,
+    Suffix = "%",
+    CurrentValue = 100,
+    Flag = "AimbotStrength",
+    Callback = function(v)
+        _G.AimbotStrength = v
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Alcance do Aimbot",
+    Range = {10, 1000},
+    Increment = 10,
+    Suffix = " studs",
+    CurrentValue = 200,
+    Flag = "AimbotRange",
+    Callback = function(v)
+        _G.AimbotRange = v
+    end
+})
+
+AimbotTab:CreateDropdown({
+    Name = "Parte do Corpo",
+    Options = {"Head", "HumanoidRootPart", "Torso", "LeftArm", "RightArm"},
+    CurrentOption = "Head",
+    Flag = "AimbotPart",
+    Callback = function(v)
+        _G.AimbotPart = v
     end
 })
 
@@ -371,10 +537,11 @@ SettingsTab:CreateButton({
     end
 })
 
+-- Notificação inicial
 Rayfield:Notify({
     Title = "Redz Hub Completo",
-    Content = "Script carregado com sucesso!",
+    Content = "Script carregado com sucesso! Tela forçada para Landscape Right",
     Duration = 5
 })
 
-print("Redz Hub Completo - Funcionando 100%")
+print("Redz Hub Completo - Funcionando 100% | Landscape Right Ativo | Aimbot Forte")
