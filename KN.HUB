@@ -1,547 +1,124 @@
--- Redz Hub Completo 2025 - 100% Funcional (Melhorado)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- MOBILE HUB COMPACTO v3.0
+local Players,RunService,UserInputService,Workspace,StarterGui,CoreGui=game:GetService("Players"),game:GetService("RunService"),game:GetService("UserInputService"),game:GetService("Workspace"),game:GetService("StarterGui"),game:GetService("CoreGui")
+local LocalPlayer,Camera=Players.LocalPlayer,Workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({
-    Name = "Redz Hub v2.0 - Completo",
-    LoadingTitle = "Redz Hub",
-    LoadingSubtitle = "by Grok",
-    ConfigurationSaving = {Enabled = true, FolderName = "RedzHub", FileName = "Config"},
-    KeySystem = false
-})
+-- CONFIGS
+_G.Aimbot,_G.ESP,_G.FOV,_G.Landscape,_G.TeamCheck,_G.Smooth,_G.FOVRad,_G.Part=false,false,true,true,true,0.08,200,"Head"
+_G.AimTarg=nil
 
--- Variáveis
-_G.AutoFarm = false
-_G.AutoBoss = false
-_G.AutoChest = false
-_G.AutoFruit = false
-_G.TeamCheck = true
-_G.Aimbot = false
-_G.AimbotStrength = 100 -- Força do aimbot (quanto maior, mais rápido puxa)
-_G.AimbotRange = 200 -- Alcance do aimbot
-_G.AimbotPart = "Head" -- Parte do corpo para mirar
+-- FORÇAR LANDSCAPE
+spawn(function()while _G.Landscape do pcall(function()StarterGui.ScreenOrientation=Enum.ScreenOrientation.LandscapeRight end)wait(0.1)end end)
 
--- FORÇAR TELA DEITADA PARA O LADO DIREITO
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
+-- CRIAR UI
+local SG=Instance.new("ScreenGui",CoreGui)
+SG.ResetOnSpawn=false
+local MF=Instance.new("Frame",SG)
+MF.Size,MF.Position,MF.BackgroundColor3=UDim2.new(0,200,0,300),UDim2.new(0,10,0.5,-150),Color3.new(0.1,0.1,0.1)
+Instance.new("UICorner",MF).CornerRadius=UDim.new(0,10)
 
--- Função para forçar landscape right
-local function forceLandscapeRight()
-    -- Tenta múltiplos métodos para garantir que funcione
-    pcall(function()
-        -- Método 1: StarterGui
-        StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
-        
-        -- Método 2: UserInputService
-        UserInputService.OrientationChanged:Connect(function()
-            StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
-        end)
-        
-        -- Método 3: Forçar constantemente
-        spawn(function()
-            while wait(0.1) do
-                pcall(function()
-                    StarterGui.ScreenOrientation = Enum.ScreenOrientation.LandscapeRight
-                end)
-            end
-        end)
-    end)
+local function Btn(n,s,c)
+ local b=Instance.new("TextButton",MF)
+ b.Size=UDim2.new(0,180,0,35)
+ b.Position=UDim2.new(0,10,0,50+#MF:GetChildren()*40)
+ b.BackgroundColor3=s and Color3.new(0,0.7,0.3)or Color3.new(0.2,0.2,0.2)
+ b.Text=n..(s and" ON"or" OFF")
+ b.TextColor3=Color3.new(1,1,1)
+ b.Font=Enum.Font.GothamBold
+ b.TextSize=14
+ Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+ b.MouseButton1Click:Connect(function()
+  _G[c]=not _G[c]
+  b.BackgroundColor3=_G[c]and Color3.new(0,0.7,0.3)or Color3.new(0.2,0.2,0.2)
+  b.Text=n..(_G[c]and" ON"or" OFF")
+ end)
 end
 
--- Executar imediatamente
-forceLandscapeRight()
+Btn("🎯 AIMBOT",_G.Aimbot,"Aimbot")
+Btn("👁️ ESP",_G.ESP,"ESP")
+Btn("⭕ FOV",_G.FOV,"FOV")
+Btn("📱 LANDSCAPE",_G.Landscape,"Landscape")
+Btn("👥 TEAM",_G.TeamCheck,"TeamCheck")
 
--- Funções principais
-local function getEnemies()
-    local enemies = {}
-    if game.Workspace:FindFirstChild("Enemies") then
-        for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
-            if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
-                if _G.TeamCheck and v:FindFirstChild("Team") and v.Team.Value == game.Players.LocalPlayer.Team then
-                    -- Pula aliados
-                else
-                    table.insert(enemies, v)
-                end
-            end
-        end
+-- FOV CIRCLE
+local FC=Drawing.new("Circle")
+FC.Thickness,FC.NumSides,FC.Filled=2,50,false
+
+-- ESP STORAGE
+local E={}
+
+-- FUNÇÕES
+local function GetTarget()
+ local c,d=nil,math.huge
+ local sc=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
+ for _,p in pairs(Players:GetPlayers())do
+  if p~=LocalPlayer and p.Character and p.Character:FindFirstChild(_G.Part)then
+   local h=p.Character:FindFirstChild("Humanoid")
+   if h and h.Health>0 then
+    if _G.TeamCheck and p.Team==LocalPlayer.Team then continue end
+    local pos,on=Camera:WorldToViewportPoint(p.Character[_G.Part].Position)
+    if on then
+     local dist=(Vector2.new(pos.X,pos.Y)-sc).Magnitude
+     if dist<_G.FOVRad and dist<d then d,c=dist,p end
     end
-    return enemies
+   end
+  end
+ end
+ return c
 end
 
-local function getBosses()
-    local bosses = {}
-    if game.Workspace:FindFirstChild("Enemies") then
-        for _, v in pairs(game.Workspace.Enemies:GetChildren()) do
-            if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
-                if v.Name:find("Boss") or v.Name:find("Saber") or v.Name:find("Warden") or v.Name:find("Chief") then
-                    table.insert(bosses, v)
-                end
-            end
-        end
-    end
-    return bosses
+local function Aimbot()
+ if not _G.Aimbot then _G.AimTarg=nil return end
+ _G.AimTarg=GetTarget()
+ if _G.AimTarg and _G.AimTarg.Character then
+  local t=_G.AimTarg.Character[_G.Part]
+  local p=t.Position+t.Velocity*0.165
+  Camera.CFrame=Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position,p),1-_G.Smooth)
+ end
 end
 
-local function getChests()
-    local chests = {}
-    for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v.Name == "Chest1" or v.Name == "Chest2" or v.Name == "Chest3" or v.Name == "BoneChest" then
-            if v:FindFirstChild("Chest") then
-                table.insert(chests, v)
-            end
-        end
+local function ESP()
+ for _,e in pairs(E)do if e.B then e.B.Visible=false end if e.T then e.T.Visible=false end if e.N then e.N.Visible=false end end
+ if not _G.ESP then return end
+ for _,p in pairs(Players:GetPlayers())do
+  if p~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart")then
+   local c,h=p.Character,p.Character:FindFirstChild("Humanoid")
+   if h and h.Health>0 then
+    if _G.TeamCheck and p.Team==LocalPlayer.Team then continue end
+    local pos,on=Camera:WorldToViewportPoint(c.HumanoidRootPart.Position)
+    if on then
+     if not E[p]then
+      E[p]={B=Drawing.new("Square"),T=Drawing.new("Line"),N=Drawing.new("Text")}
+      E[p].B.Thickness,E[p].B.Filled=2,false
+      E[p].N.Size,E[p].N.Center,E[p].N.Outline=14,true,true
+     end
+     local box=math.abs(Camera:WorldToViewportPoint(c.HumanoidRootPart.Position+Vector3.new(0,3,0)).Y-Camera:WorldToViewportPoint(c.HumanoidRootPart.Position-Vector3.new(0,3,0)).Y)
+     E[p].B.Size=Vector2.new(box*0.6,box)
+     E[p].B.Position=Vector2.new(pos.X-box*0.3,pos.Y-box/2)
+     E[p].B.Color=_G.TeamCheck and p.Team==LocalPlayer.Team and Color3.new(0,1,0)or Color3.new(1,0,0)
+     E[p].B.Visible=true
+     E[p].T.From=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
+     E[p].T.To=Vector2.new(pos.X,pos.Y+box/2)
+     E[p].T.Color=E[p].B.Color
+     E[p].T.Visible=true
+     E[p].N.Text=p.Name.." "..math.floor(h.Health).."HP"
+     E[p].N.Position=Vector2.new(pos.X,pos.Y-box/2-20)
+     E[p].N.Color=Color3.new(1,1,1)
+     E[p].N.Visible=true
     end
-    return chests
+   end
+  end
+ end
 end
 
-local function getFruits()
-    local fruits = {}
-    for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v:IsA("Tool") and v:FindFirstChild("Handle") and v.Name:find("Fruit") then
-            table.insert(fruits, v)
-        end
-    end
-    return fruits
-end
+-- LOOP
+RunService.RenderStepped:Connect(function()
+ local s=Camera.ViewportSize
+ FC.Position=Vector2.new(s.X/2,s.Y/2)
+ FC.Radius=_G.FOVRad
+ FC.Color=_G.AimTarg and Color3.new(0,1,0)or Color3.new(1,1,1)
+ FC.Visible=_G.FOV
+ Aimbot()
+ ESP()
+end)
 
--- AIMBOT FORTE SEM CHECK TIME
-local function getClosestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = _G.AimbotRange
-    local localPlayer = game.Players.LocalPlayer
-    local localCharacter = localPlayer.Character
-    
-    if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then return nil end
-    
-    for _, player in pairs(game.Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character then
-            local character = player.Character
-            local humanoid = character:FindFirstChild("Humanoid")
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            local targetPart = character:FindFirstChild(_G.AimbotPart)
-            
-            if humanoid and humanoid.Health > 0 and hrp and targetPart then
-                -- Verifica time se TeamCheck estiver ativo
-                if _G.TeamCheck then
-                    if player.Team == localPlayer.Team then
-                        continue
-                    end
-                end
-                
-                local distance = (hrp.Position - localCharacter.HumanoidRootPart.Position).Magnitude
-                if distance < shortestDistance then
-                    shortestDistance = distance
-                    closestPlayer = player
-                end
-            end
-        end
-    end
-    
-    return closestPlayer
-end
-
--- Aimbot loop - SEM CHECK TIME, SEMPRE ATIVO QUANDO LIGADO
-local aimbotConnection = nil
-
-local function startAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect() end
-    
-    aimbotConnection = RunService.RenderStepped:Connect(function()
-        if not _G.Aimbot then return end
-        
-        local target = getClosestPlayer()
-        if target and target.Character then
-            local targetPart = target.Character:FindFirstChild(_G.AimbotPart)
-            local localCharacter = game.Players.LocalPlayer.Character
-            
-            if targetPart and localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
-                -- Cálculo de predição para aimbot mais forte
-                local targetVelocity = targetPart.Velocity
-                local predictionFactor = _G.AimbotStrength / 100
-                
-                local targetPosition = targetPart.Position + (targetVelocity * 0.1 * predictionFactor)
-                
-                -- CFrame.lookAt para mirar instantaneamente
-                local newCFrame = CFrame.new(
-                    localCharacter.HumanoidRootPart.Position,
-                    targetPosition
-                )
-                
-                -- Aplicação suave mas forte da rotação
-                localCharacter.HumanoidRootPart.CFrame = newCFrame
-            end
-        end
-    end)
-end
-
--- Aba Principal
-local MainTab = Window:CreateTab("⚔️ Farm", 4483362458)
-
-MainTab:CreateSection("Auto Farm")
-
-MainTab:CreateToggle({
-    Name = "Auto Farm (Mobs)",
-    CurrentValue = false,
-    Flag = "AutoFarm",
-    Callback = function(v)
-        _G.AutoFarm = v
-        if v then
-            spawn(function()
-                while _G.AutoFarm do
-                    pcall(function()
-                        local player = game.Players.LocalPlayer
-                        local char = player.Character
-                        if not char then return end
-                        
-                        local enemies = getEnemies()
-                        local closest = nil
-                        local dist = math.huge
-                        
-                        for _, e in pairs(enemies) do
-                            local d = (e.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
-                            if d < dist then
-                                dist = d
-                                closest = e
-                            end
-                        end
-                        
-                        if closest then
-                            char.HumanoidRootPart.CFrame = closest.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
-                            wait(0.2)
-                            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Attack")
-                        end
-                    end)
-                    wait(0.5)
-                end
-            end)
-        end
-    end
-})
-
-MainTab:CreateToggle({
-    Name = "Auto Boss",
-    CurrentValue = false,
-    Flag = "AutoBoss",
-    Callback = function(v)
-        _G.AutoBoss = v
-        if v then
-            spawn(function()
-                while _G.AutoBoss do
-                    pcall(function()
-                        local player = game.Players.LocalPlayer
-                        local char = player.Character
-                        if not char then return end
-                        
-                        local bosses = getBosses()
-                        if #bosses > 0 then
-                            local boss = bosses[1]
-                            char.HumanoidRootPart.CFrame = boss.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
-                            wait(0.2)
-                            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Attack")
-                        end
-                    end)
-                    wait(0.5)
-                end
-            end)
-        end
-    end
-})
-
-MainTab:CreateToggle({
-    Name = "Auto Chest (Baús)",
-    CurrentValue = false,
-    Flag = "AutoChest",
-    Callback = function(v)
-        _G.AutoChest = v
-        if v then
-            spawn(function()
-                while _G.AutoChest do
-                    pcall(function()
-                        local player = game.Players.LocalPlayer
-                        local char = player.Character
-                        if not char then return end
-                        
-                        local chests = getChests()
-                        if #chests > 0 then
-                            local chest = chests[1]
-                            char.HumanoidRootPart.CFrame = chest.CFrame * CFrame.new(0, 0, 3)
-                            wait(0.3)
-                            fireclickdetector(chest.Chest.ClickDetector)
-                            wait(1)
-                        end
-                    end)
-                    wait(1)
-                end
-            end)
-        end
-    end
-})
-
-MainTab:CreateToggle({
-    Name = "Auto Fruit (Coletar Frutas)",
-    CurrentValue = false,
-    Flag = "AutoFruit",
-    Callback = function(v)
-        _G.AutoFruit = v
-        if v then
-            spawn(function()
-                while _G.AutoFruit do
-                    pcall(function()
-                        local player = game.Players.LocalPlayer
-                        local char = player.Character
-                        if not char then return end
-                        
-                        local fruits = getFruits()
-                        if #fruits > 0 then
-                            local fruit = fruits[1]
-                            char.HumanoidRootPart.CFrame = fruit.Handle.CFrame * CFrame.new(0, 0, 2)
-                            wait(0.5)
-                        end
-                    end)
-                    wait(1)
-                end
-            end)
-        end
-    end
-})
-
-MainTab:CreateToggle({
-    Name = "Team Check (Não atacar aliados)",
-    CurrentValue = true,
-    Flag = "TeamCheck",
-    Callback = function(v)
-        _G.TeamCheck = v
-    end
-})
-
--- ABA AIMBOT (NOVA)
-local AimbotTab = Window:CreateTab("🎯 Aimbot", 4483362458)
-
-AimbotTab:CreateSection("Aimbot Settings")
-
-AimbotTab:CreateToggle({
-    Name = "Aimbot (Sem Delay)",
-    CurrentValue = false,
-    Flag = "Aimbot",
-    Callback = function(v)
-        _G.Aimbot = v
-        if v then
-            startAimbot()
-            Rayfield:Notify({
-                Title = "Aimbot Ativado",
-                Content = "Mirando em: " .. _G.AimbotPart .. " | Força: " .. _G.AimbotStrength .. "%",
-                Duration = 3
-            })
-        else
-            if aimbotConnection then
-                aimbotConnection:Disconnect()
-                aimbotConnection = nil
-            end
-        end
-    end
-})
-
-AimbotTab:CreateSlider({
-    Name = "Força do Aimbot",
-    Range = {1, 100},
-    Increment = 1,
-    Suffix = "%",
-    CurrentValue = 100,
-    Flag = "AimbotStrength",
-    Callback = function(v)
-        _G.AimbotStrength = v
-    end
-})
-
-AimbotTab:CreateSlider({
-    Name = "Alcance do Aimbot",
-    Range = {10, 1000},
-    Increment = 10,
-    Suffix = " studs",
-    CurrentValue = 200,
-    Flag = "AimbotRange",
-    Callback = function(v)
-        _G.AimbotRange = v
-    end
-})
-
-AimbotTab:CreateDropdown({
-    Name = "Parte do Corpo",
-    Options = {"Head", "HumanoidRootPart", "Torso", "LeftArm", "RightArm"},
-    CurrentOption = "Head",
-    Flag = "AimbotPart",
-    Callback = function(v)
-        _G.AimbotPart = v
-    end
-})
-
--- Aba Teleports
-local TeleTab = Window:CreateTab("🚀 Teleports", 4483362458)
-
-TeleTab:CreateSection("Sea 1")
-
-local teleports1 = {
-    {"Marine Starter", CFrame.new(-2610, 8, 2050)},
-    {"Pirate Starter", CFrame.new(1115, 15, 1445)},
-    {"Marine Fortress", CFrame.new(-1320, 13, 3770)},
-    {"Orange Town", CFrame.new(975, 0, 1200)},
-    {"Frozen Village", CFrame.new(1150, 23, -540)},
-    {"Desert", CFrame.new(1470, 13, -2300)},
-    {"Colosseum", CFrame.new(-1850, 8, -1300)},
-    {"Sky Island", CFrame.new(-5000, 1100, -5000)},
-    {"Kingdom of Rose", CFrame.new(-8000, 4400, -6000)}
-}
-
-for _, tp in ipairs(teleports1) do
-    TeleTab:CreateButton({
-        Name = tp[1],
-        Callback = function()
-            local char = game.Players.LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame = tp[2]
-            end
-        end
-    })
-end
-
-TeleTab:CreateSection("Sea 2")
-
-local teleports2 = {
-    {"Green Zone", CFrame.new(-2400, 12, -1200)},
-    {"Cafe", CFrame.new(-380, 35, -280)},
-    {"Castle on the Sea", CFrame.new(-550, 25, -450)},
-    {"Hot Island", CFrame.new(6000, 20, 1000)}
-}
-
-for _, tp in ipairs(teleports2) do
-    TeleTab:CreateButton({
-        Name = tp[1],
-        Callback = function()
-            local char = game.Players.LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame = tp[2]
-            end
-        end
-    })
-end
-
--- Aba ESP
-local ESPTab = Window:CreateTab("👁️ ESP", 4483362458)
-
-ESPTab:CreateToggle({
-    Name = "ESP Players",
-    CurrentValue = false,
-    Flag = "ESPPlayers",
-    Callback = function(v)
-        if v then
-            spawn(function()
-                while wait(1) do
-                    for _, p in pairs(game.Players:GetPlayers()) do
-                        if p ~= game.Players.LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                            if not p.Character.Head:FindFirstChild("ESP") then
-                                local b = Instance.new("BillboardGui")
-                                b.Name = "ESP"
-                                b.Parent = p.Character.Head
-                                b.Size = UDim2.new(0, 150, 0, 40)
-                                b.StudsOffset = Vector3.new(0, 2, 0)
-                                b.AlwaysOnTop = true
-                                
-                                local t = Instance.new("TextLabel")
-                                t.Parent = b
-                                t.Size = UDim2.new(1, 0, 1, 0)
-                                t.BackgroundTransparency = 1
-                                t.Text = p.Name .. " [" .. math.floor(p.Character.Humanoid.Health) .. "HP]"
-                                t.TextColor3 = Color3.new(0, 1, 0)
-                                t.TextStrokeTransparency = 0
-                                t.TextScaled = true
-                            end
-                        end
-                    end
-                end
-            end)
-        else
-            for _, p in pairs(game.Players:GetPlayers()) do
-                if p.Character and p.Character:FindFirstChild("Head") and p.Character.Head:FindFirstChild("ESP") then
-                    p.Character.Head.ESP:Destroy()
-                end
-            end
-        end
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "ESP Chests",
-    CurrentValue = false,
-    Flag = "ESPChests",
-    Callback = function(v)
-        if v then
-            spawn(function()
-                while wait(1) do
-                    for _, chest in pairs(getChests()) do
-                        if chest and not chest:FindFirstChild("ESP") then
-                            local b = Instance.new("BillboardGui")
-                            b.Name = "ESP"
-                            b.Parent = chest
-                            b.Size = UDim2.new(0, 100, 0, 30)
-                            b.StudsOffset = Vector3.new(0, 2, 0)
-                            b.AlwaysOnTop = true
-                            
-                            local t = Instance.new("TextLabel")
-                            t.Parent = b
-                            t.Size = UDim2.new(1, 0, 1, 0)
-                            t.BackgroundTransparency = 1
-                            t.Text = "📦 Baú"
-                            t.TextColor3 = Color3.new(1, 1, 0)
-                            t.TextScaled = true
-                        end
-                    end
-                end
-            end)
-        else
-            for _, chest in pairs(getChests()) do
-                if chest and chest:FindFirstChild("ESP") then
-                    chest.ESP:Destroy()
-                end
-            end
-        end
-    end
-})
-
--- Aba Scripts
-local ScriptTab = Window:CreateTab("📜 Scripts", 4483362458)
-
-local ScriptInput = ScriptTab:CreateInput({
-    Name = "Cole seu script",
-    PlaceholderText = "loadstring...",
-    Flag = "ScriptInput"
-})
-
-ScriptTab:CreateButton({
-    Name = "Executar Script",
-    Callback = function()
-        local s = ScriptInput.Value
-        if s and s ~= "" then
-            pcall(function() loadstring(s)() end)
-            Rayfield:Notify("Script executado!")
-        end
-    end
-})
-
--- Aba Settings
-local SettingsTab = Window:CreateTab("⚙️ Config", 4483362458)
-
-SettingsTab:CreateButton({
-    Name = "Fechar Hub",
-    Callback = function()
-        Rayfield:Destroy()
-    end
-})
-
--- Notificação inicial
-Rayfield:Notify({
-    Title = "Redz Hub Completo",
-    Content = "Script carregado com sucesso! Tela forçada para Landscape Right",
-    Duration = 5
-})
-
-print("Redz Hub Completo - Funcionando 100% | Landscape Right Ativo | Aimbot Forte")
+print("✅ Mobile Hub Compacto - OK")
